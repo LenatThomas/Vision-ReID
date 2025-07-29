@@ -1,6 +1,6 @@
 kaggle.json
 .kaggle/
-.data/
+data/
 __pycache__
 .env
-.market/
+market/
