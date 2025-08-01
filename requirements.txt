@@ -1,0 +1,7 @@
+kagglehub==0.3.12
+Pillow==11.3.0
+scipy==1.16.1
+torch==2.5.1
+torchinfo==1.8.0
+torchvision==0.20.1
+tqdm==4.67.1
