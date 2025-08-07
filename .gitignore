@@ -7,3 +7,5 @@ market/
 vit/
 vt/
 .pth
+logs/
+model/
