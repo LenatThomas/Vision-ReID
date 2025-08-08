@@ -1,10 +1,18 @@
 import torch
+import os
 import torch.nn as nn
+from dotenv import load_dotenv
+from pathlib import Path
 from VT import VIT
 from Dataset import ReIDset
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+VERSION = 'VIT 0.1'
+load_dotenv()
+dataPath = Path(os.getenv('SAVE_PATH')) / 'datasets/market1501/query/'
+modelPath = Path(os.getenv('SAVE_PATH')) / f'models/{VERSION}.pth'
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 generator = torch.Generator().manual_seed(0)
@@ -13,10 +21,10 @@ transform = Compose([
     ToTensor(),
     Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
-testSet = ReIDset('./reid/market/query', transform=transform)
+testSet = ReIDset(dataPath, transform=transform)
 testLoader = DataLoader(dataset=testSet, num_workers=4, batch_size=32, shuffle=False)
 model = VIT(imageHeight=256, imageWidth=128, nClasses=testSet.nClasses + 1).to(device)
-modelState = torch.load("model.pth", map_location=device)
+modelState = torch.load(modelPath, map_location=device)
 model.load_state_dict(modelState)
 model.eval()
 criterion = nn.CrossEntropyLoss()
