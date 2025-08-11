@@ -2,7 +2,8 @@ import os
 import torch
 from pathlib import Path
 from dotenv import load_dotenv
-from Dataset import ReIDset, PKSampler
+from Data.Dataset import ReIDset
+from Data.Sampler import PKSampler
 from torch.utils.data import DataLoader, random_split
 from torchvision.transforms import Compose, Resize, ToTensor, RandomHorizontalFlip, Normalize
 

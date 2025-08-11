@@ -10,8 +10,10 @@ from torchvision.transforms import Compose, Resize, ToTensor, Normalize, RandomH
 from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 from torch import nn 
-from VT import VIT
-from Dataset import ReIDset, PKSampler, mineTriplets
+from Model.Vit import VIT
+from Data.Dataset import ReIDset
+from Data.Sampler import PKSampler
+from Data.Losses import mineTriplets
 from Utils import TrainingTracker, setupLogger
 
 load_dotenv()

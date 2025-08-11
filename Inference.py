@@ -3,8 +3,8 @@ import os
 import torch.nn as nn
 from dotenv import load_dotenv
 from pathlib import Path
-from VT import VIT
-from Dataset import ReIDset
+from Model.Vit import VIT
+from Data.Dataset import ReIDset
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from torch.utils.data import DataLoader
 from tqdm import tqdm
