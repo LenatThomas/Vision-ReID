@@ -1,7 +1,9 @@
 import os
 import random
+import math
+import numpy as np
 import torchvision.transforms as T
-import torch.utils.data.sampler as Sampler 
+from torch.utils.data import Sampler
 from PIL import Image
 
 class ReIDset():
@@ -13,7 +15,7 @@ class ReIDset():
         self._length = len(self._paths)
         self._pids = [self._extractInfo(fname)[0] for fname in self._paths]
         self._cids = [self._extractInfo(fname)[1] for fname in self._paths]
-        self._labels = {pid : idx for idx, pid in enumerate(set(self._pids))}
+        self._labels = {pid : idx for idx, pid in enumerate(sorted(set(self._pids)))}
         self._transform = transform or T.Compose([
             T.Resize((256, 128)),
             T.RandomHorizontalFlip(),
@@ -21,12 +23,21 @@ class ReIDset():
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         self._iterator = 0
+        self._dict = {}
+        self._buildDict()
 
     def _extractInfo(self, fname):
         splits = fname.split('_')
         pid    = splits[0]
         cid    = splits[1]
         return (pid , cid)
+    
+    def _buildDict(self):
+        self._dict = {}
+        for index , label in enumerate(self._pids):
+            if label not in self._dict.keys():
+                self._dict[label] = []
+            self._dict[label].append(index)
     
     def __getitem__(self, index):
         if index >= self._length or index < 0:
@@ -42,12 +53,12 @@ class ReIDset():
         return self._length
     
     def __iter__(self):
-        self._interator = 0
+        self._iterator = 0
         return self
     
     def __next__(self):
-        index = self._interator
-        self._interator += 1
+        index = self._iterator
+        self._iterator += 1
         if self._iterator < self._length:
             fname = os.path.join(self._directory, self._paths[index])
             image = Image.open(fname).convert('RGB')
@@ -57,58 +68,58 @@ class ReIDset():
             return image, label
         else :
             raise StopIteration
+        
+    @property
+    def labelDict(self):
+        return self._dict
 
     @property
     def nClasses(self):
         return len(self._labels.keys())
 
 class PKSampler(Sampler):
-    def __init__(self, dataset, batchSize, nInstances):
-        self._pidDict = {}
-        self._batches = []
-        self._pids    = []
-        self._data = dataset
-        self._batchSize = batchSize
-        self._nInstances = nInstances
-        self._build()
+    def __init__(self , dataset,  p = 16 , k = 4):
+        self._p = p
+        self._k = k
+        self._pk = p * k
+        self._dataset = dataset
+        self._labelDict = {}
+        self._labels = {}
+        self._labelCounts = {}
 
-        
-    def _prepareBatches(self):
-        self._pids = random.shuffle(self._pids)
-        batch = []
-        while(self.pid):
-            for i in self._pids:
-                nsamples = min(self._nInstances , len(self._pidDict[i]))
-                random.shuffle(self._pidDict[i])
-                samples = self._pidDict[i][0:nsamples]
-                self._pidDict[i] = self._pidDict[i][nsamples:]
-                
-                for k in samples:
-                    batch.append(k)
-                    if len(batch) > self._batchSize:
-                        self._batches.append(batch)
-                        batch = []
+    def _reset(self):
+        self._labelDict = self._dataset.labelDict
+        self._labels = list(self._labelDict.keys())
+        random.shuffle(self._labels)
+        self._labelCounts = {label : 0 for label in self._labels}
 
-
-
-    def _build(self):
-        self._pidDict = {}
-        for index, (_, label) in enumerate(self._data):
-            if label not in self._pidDict.keys():
-                self._pidDict[label] = [index]
-            else :
-                self._pidDict[label].append(index)
-        self._pids = self._pidDict.keys()
- 
     def __iter__(self):
-        return self._batch
-    
-    def __next__(self):
-        if self._pidDict.keys():
-            self._createBatch()
-        else :
-            raise StopIteration
-
-    def __len__():
-        pass
-
+        self._reset()
+        labels = self._labels.copy()
+        batch = []
+        while (len(labels) != 0):
+            selected = random.sample(labels, min(self._p, len(labels)))
+            for l in selected:
+                instances = self._labelDict[l]
+                if len(instances) < self._k:
+                    samples = random.choices(instances, k = self._k)
+                else :
+                    samples = random.sample(instances, k = self._k)
+                batch.extend(samples)
+                self._labelCounts[l] += self._k
+                if self._labelCounts[l] >= len(instances) and l in labels:
+                    labels.remove(l)
+            if len(batch) == self._pk:
+                random.shuffle(batch)
+                yield batch
+                batch = []
+                
+        if len(batch) != 0:
+            print('Triggered1')
+            if len(batch) < self._pk:
+                print('Triggered 2')
+                samples = int(self._pk - len(batch))
+                batch.extend(random.choices(range(len(self._dataset)), k = samples))
+            batch = batch[:self._pk]
+            random.shuffle(batch)
+            yield batch
