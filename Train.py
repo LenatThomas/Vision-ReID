@@ -11,15 +11,17 @@ from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 from torch import nn 
 from VT import VIT
-from Dataset import ReIDset
+from Dataset import ReIDset, PKSampler, mineTriplets
 from Utils import TrainingTracker, setupLogger
 
 load_dotenv()
 
-EPOCHS = 50
-BATCHSIZE = 32
+EPOCHS = 75
 LEARNING_RATE = 3e-4
-VERSION = 'VIT 0.1'
+VERSION = 'VIT 1.0'
+P = 20
+K = 6
+BATCHSIZE = P * K
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logFile = Path(os.getenv("SAVE_PATH"))/ f"logs/{VERSION}.txt"
@@ -37,7 +39,7 @@ if torch.cuda.is_available():
     logger.info(f"CUDA Version: {torch.version.cuda}")
 logger.info(f"Using model {VERSION}")
 logger.info(f"Using device {device}")
-logger.info(f"Hyperparameters: EPOCHS={EPOCHS}, BATCHSIZE={BATCHSIZE}, LR={LEARNING_RATE}")
+logger.info(f"Hyperparameters: EPOCHS = {EPOCHS}, BATCHSIZE = {BATCHSIZE}, P = {P}, K = {K}, LR = {LEARNING_RATE}")
 
 
 if __name__ == '__main__':
@@ -55,12 +57,15 @@ if __name__ == '__main__':
         trainSize   = int(0.8 * len(dataset))
         valSize     = len(dataset) - trainSize
         train , val = random_split(dataset, [trainSize , valSize], generator = generator)
-        trainLoader = DataLoader(dataset = train, batch_size = BATCHSIZE , shuffle = True, num_workers = 4)
-        valLoader   = DataLoader(dataset = val , batch_size = BATCHSIZE , shuffle = False, num_workers = 4)
+        trainSampler= PKSampler(dataset = dataset , indices = train.indices, p = P, k = K)
+        valSampler  = PKSampler(dataset = dataset , indices = val.indices, p = P, k = K)
+        trainLoader = DataLoader(dataset = dataset, num_workers = 4, batch_sampler = trainSampler)
+        valLoader   = DataLoader(dataset = dataset, num_workers = 4, batch_sampler = valSampler)
         model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
-        criterion   = nn.CrossEntropyLoss()
+        classificationCriterion   = nn.CrossEntropyLoss()
+        verificationCriterion = nn.TripletMarginLoss(margin = 0.3) 
         optimizer   = AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 0.05)
-        logger.info(f"Criterion = {criterion.__class__.__name__} Optimizer = {optimizer.__class__.__name__}")
+        logger.info(f"Criterion = [{classificationCriterion.__class__.__name__}, {verificationCriterion.__class__.__name__}] Optimizer = {optimizer.__class__.__name__} Sampler = {trainSampler.__class__.__name__}")
         if len(trainLoader) == 0 or len(valLoader) == 0:
             logger.error("Empty DataLoader!")
             raise ValueError("DataLoader is empty")
@@ -70,7 +75,8 @@ if __name__ == '__main__':
         trainTracker = TrainingTracker()
         valTracker   = TrainingTracker()
 
-
+        startTime = datetime.now()
+        logger.info(f'Training Started at {startTime}')
         for epoch in range(EPOCHS):
             print(f'Epoch : {epoch}')
             model.train()
@@ -79,12 +85,23 @@ if __name__ == '__main__':
             for images, labels in tqdm(trainLoader, desc = "Training"):
                 images, labels = images.to(device), labels.to(device)
                 optimizer.zero_grad()
-                outputs = model(images)
-                loss = criterion(outputs , labels)
+
+                outputs, embeddings = model(images)
+                cLoss   = classificationCriterion(outputs , labels)
+                triplets = mineTriplets(embeddings = embeddings, labels = labels)
+                if triplets:
+                    anchors = embeddings[[t[0] for t in triplets]]
+                    positives = embeddings[[t[1] for t in triplets]]
+                    negatives = embeddings[[t[2] for t in triplets]]
+                    tLoss = verificationCriterion(anchors, positives, negatives)
+                else : 
+                    tLoss = 0
+                loss = cLoss + tLoss
+                
                 loss.backward()
                 optimizer.step()
                 _, predicted = torch.max(outputs, 1)
-                trainTracker.update(loss, batch = images.size(0) , predicted = predicted , labels = labels)
+                trainTracker.update(cLoss, batch = images.size(0) , predicted = predicted , labels = labels)
 
 
             model.eval()
@@ -92,16 +109,17 @@ if __name__ == '__main__':
                 for images, labels in tqdm(valLoader, desc="Validating"):
                     images, labels = images.to(device), labels.to(device)
                     outputs = model(images)
-                    loss = criterion(outputs, labels)
+                    cLoss = classificationCriterion(outputs, labels)
                     _, predicted = torch.max(outputs, 1)
-                    valTracker.update(loss, batch = images.size(0), predicted = predicted, labels = labels)
+                    valTracker.update(cLoss, batch = images.size(0), predicted = predicted, labels = labels)
 
-            logger.info(f'Epoch {epoch} Train Loss {trainTracker.loss} Train Accuracy {trainTracker.accuracy} Validation Loss {valTracker.loss} Validation Accuracy {valTracker.accuracy}')
+            logger.info(f'Epoch {epoch} Train Loss {trainTracker.loss:.6f} Train Accuracy {trainTracker.accuracy:.6f} Validation Loss {valTracker.loss:.6f} Validation Accuracy {valTracker.accuracy:.6f}')
             if valTracker.accuracy > bestAccuracy:
                 bestAccuracy = valTracker.accuracy
                 torch.save(model.state_dict(), modelFile , pickle_protocol = 4)
                 logger.info("Accuracy Improved, best model saved")
-
+        logger.info(f'Training Ended at {datetime.now()}')
+        logger.info(f'Training Duration = {datetime.now() - startTime}')
 
     except KeyboardInterrupt:
         logger.warning('Training Interrupted by user')

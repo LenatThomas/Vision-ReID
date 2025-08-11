@@ -50,7 +50,7 @@ class MLPBlock(nn.Module):
 class TransformerBlock(nn.Module):
     def __init__(self, embedDim , mlpDim , mlpDropout = 0.1, msaDropout = 0.1 , nHeads = 12 , *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mlp = MLPBlock(indim = embedDim , outdim = embedDim , interdim = mlpDim, dropout = mlpDropout)
+        self.mlp = MLPBlock(inDim = embedDim , outDim = embedDim , interDim = mlpDim, dropout = mlpDropout)
         self.msa = MSABlock(embedDim = embedDim, nHeads = nHeads, dropout = msaDropout)
 
     def forward(self, x):
@@ -66,7 +66,7 @@ class VIT(nn.Module):
                  featureDim = 512, 
                  nBlocks    = 12,
                  patchSize  = 16, 
-                 nchannels   = 3, 
+                 nChannels   = 3, 
                  mlpDropout = 0.1 , 
                  msaDropout = 0.0 ,
                  *args, **kwargs):
@@ -77,8 +77,8 @@ class VIT(nn.Module):
         self.nClasses    = nClasses
         self.nBlocks     = nBlocks
         self.patchSize   = patchSize
-        self.nchannels   = nchannels
-        self.embedDim    = int(self.channels * (self.patchSize ** 2))
+        self.nChannels   = nChannels
+        self.embedDim    = int(self.nChannels * (self.patchSize ** 2))
         self.nPatches    = int((self.imageHeight * self.imageWidth) / (self.patchSize ** 2))
         self.mlpdropout  = mlpDropout
         self.msadropout  = msaDropout
@@ -86,7 +86,7 @@ class VIT(nn.Module):
         self.featureDim  =  featureDim
 
         self.patches     = PatchEmbedding(
-            nChannels    = nchannels , 
+            nChannels    = self.nChannels , 
             patchSize    = patchSize, 
             nPatches     = self.nPatches, 
             embedDim     = self.embedDim)
@@ -115,4 +115,4 @@ class VIT(nn.Module):
         features = self.featureHead(x)
         features = F.normalize(features)
         logits = self.classifier(features)
-        return logits
+        return logits, features

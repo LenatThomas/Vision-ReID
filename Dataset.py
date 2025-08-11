@@ -1,5 +1,6 @@
 import os
 import random
+import torch
 import math
 import numpy as np
 import torchvision.transforms as T
@@ -70,6 +71,10 @@ class ReIDset():
             raise StopIteration
         
     @property
+    def pids(self):
+        return self._pids
+        
+    @property
     def labelDict(self):
         return self._dict
 
@@ -78,20 +83,25 @@ class ReIDset():
         return len(self._labels.keys())
 
 class PKSampler(Sampler):
-    def __init__(self , dataset,  p = 16 , k = 4):
+    def __init__(self , dataset, indices = None , p = 16 , k = 4):
         self._p = p
         self._k = k
         self._pk = p * k
         self._dataset = dataset
-        self._labelDict = {}
-        self._labels = {}
-        self._labelCounts = {}
+        self._indices = set(indices) if indices is not None else set(range(len(dataset)))
+        self._reset()
 
     def _reset(self):
-        self._labelDict = self._dataset.labelDict
+        self._labelDict = {}
+        for label, indices in self._dataset.labelDict.items():
+            filtered = [i for i in indices if i in self._indices]
+            if filtered:
+                self._labelDict[label] = filtered
+        self._totalSamples = sum(len(v) for v in self._labelDict.values())
         self._labels = list(self._labelDict.keys())
         random.shuffle(self._labels)
         self._labelCounts = {label : 0 for label in self._labels}
+        
 
     def __iter__(self):
         self._reset()
@@ -113,7 +123,7 @@ class PKSampler(Sampler):
                 random.shuffle(batch)
                 yield batch
                 batch = []
-                
+
         if len(batch) != 0:
             print('Triggered1')
             if len(batch) < self._pk:
@@ -123,3 +133,21 @@ class PKSampler(Sampler):
             batch = batch[:self._pk]
             random.shuffle(batch)
             yield batch
+
+    def __len__(self):
+        return math.ceil(self._totalSamples / self._pk)
+
+def mineTriplets(embeddings , labels):
+    pairwise = torch.cdist(embeddings, embeddings , p = 2)
+    triplets = []
+    for i , label in enumerate(labels):
+        posMask = (labels == label) & torch.arange(len(labels), device=labels.device) != i
+        negMask = (labels != label)
+        if posMask.sum() == 0 or negMask.sum() == 0:
+            continue
+        hardestNegative = pairwise[i][negMask].argmin()
+        hardestPositive = pairwise[i][posMask].argmax()
+        hardestPositive = posMask.nonzero()[hardestPositive].item()
+        hardestNegative = negMask.nonzero()[hardestNegative].item()
+        triplets.append((i , hardestPositive, hardestNegative))
+    return triplets
