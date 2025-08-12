@@ -45,9 +45,7 @@ class PKSampler(Sampler):
                 batch = []
 
         if len(batch) != 0:
-            print('Triggered1')
             if len(batch) < self._pk:
-                print('Triggered 2')
                 samples = int(self._pk - len(batch))
                 batch.extend(random.choices(range(len(self._dataset)), k = samples))
             batch = batch[:self._pk]

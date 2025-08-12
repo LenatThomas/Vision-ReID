@@ -105,8 +105,8 @@ class VIT(nn.Module):
         )
         
         self.classifier = nn.Sequential(
-            nn.LayerNorm(normalized_shape = self.embedDim),
-            nn.Linear(in_features = self.embedDim , out_features = nClasses),
+            nn.LayerNorm(normalized_shape = featureDim),
+            nn.Linear(in_features = featureDim , out_features = nClasses),
             )
 
     def forward(self, x):

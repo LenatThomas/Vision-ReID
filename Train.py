@@ -14,15 +14,16 @@ from Model.Vit import VIT
 from Data.Dataset import ReIDset
 from Data.Sampler import PKSampler
 from Data.Losses import mineTriplets
-from Utils import TrainingTracker, setupLogger
+from Utils.Logger import setupLogger
+from Utils.Tracker import TrainingTracker
 
 load_dotenv()
 
-EPOCHS = 75
+EPOCHS = 10
 LEARNING_RATE = 3e-4
 VERSION = 'VIT 1.0'
-P = 20
-K = 6
+P = 10
+K = 3
 BATCHSIZE = P * K
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -110,7 +111,7 @@ if __name__ == '__main__':
             with torch.no_grad():
                 for images, labels in tqdm(valLoader, desc="Validating"):
                     images, labels = images.to(device), labels.to(device)
-                    outputs = model(images)
+                    outputs, embeddings = model(images)
                     cLoss = classificationCriterion(outputs, labels)
                     _, predicted = torch.max(outputs, 1)
                     valTracker.update(cLoss, batch = images.size(0), predicted = predicted, labels = labels)
