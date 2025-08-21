@@ -12,7 +12,7 @@ from torch.optim import AdamW
 from torch import nn 
 from Model.Vit import VIT
 from Data.Dataset import ReIDset
-from Data.Sampler import PKSampler
+from Data.Sampler import PKSampler, PKBatchExpander
 from Data.Losses import mineTriplets
 from Utils.Logger import setupLogger
 from Utils.Tracker import TrainingTracker
@@ -21,9 +21,9 @@ load_dotenv()
 
 EPOCHS = 10
 LEARNING_RATE = 3e-4
-VERSION = 'VIT 1.0'
+VERSION = 'VIT 1.1'
 P = 32
-K = 4
+K = 5
 BATCHSIZE = P * K
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,7 +47,6 @@ logger.info(f"Hyperparameters: EPOCHS = {EPOCHS}, BATCHSIZE = {BATCHSIZE}, P = {
 
 if __name__ == '__main__':
 
-    logger.info('Initialization started')
     try: 
         generator = torch.Generator().manual_seed(0)
         transform = Compose([
@@ -60,15 +59,15 @@ if __name__ == '__main__':
         trainSize   = int(0.8 * len(dataset))
         valSize     = len(dataset) - trainSize
         train , val = random_split(dataset, [trainSize , valSize], generator = generator)
-        trainSampler= PKSampler(dataset = dataset , indices = train.indices, p = P, k = K)
-        valSampler  = PKSampler(dataset = dataset , indices = val.indices, p = P, k = K)
-        trainLoader = DataLoader(dataset = dataset, num_workers = 4, batch_sampler = trainSampler)
-        valLoader   = DataLoader(dataset = dataset, num_workers = 4, batch_sampler = valSampler)
+        trainLoader = DataLoader(dataset = train, num_workers = 4, batch_size = P, shuffle = True)
+        valLoader   = DataLoader(dataset = val, num_workers = 4, batch_size = P, shuffle = True)
+        expander    = PKBatchExpander(dataset = dataset)
+
         model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
-        classificationCriterion   = nn.CrossEntropyLoss()
-        verificationCriterion = nn.TripletMarginLoss(margin = 0.3) 
-        optimizer   = AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 0.05)
-        logger.info(f"Criterion = [{classificationCriterion.__class__.__name__}, {verificationCriterion.__class__.__name__}] Optimizer = {optimizer.__class__.__name__} Sampler = {trainSampler.__class__.__name__}")
+        classificationCriterion = nn.CrossEntropyLoss()
+        verificationCriterion   = nn.TripletMarginLoss(margin = 0.3) 
+        optimizer               = AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 0.05)
+        logger.info(f"Criterion = [{classificationCriterion.__class__.__name__}, {verificationCriterion.__class__.__name__}] Optimizer = {optimizer.__class__.__name__} Sampler = {expander.__class__.__name__}")
         if len(trainLoader) == 0 or len(valLoader) == 0:
             logger.error("Empty DataLoader!")
             raise ValueError("DataLoader is empty")
@@ -81,25 +80,28 @@ if __name__ == '__main__':
         startTime = datetime.now()
         logger.info(f'Training Started at {startTime}')
         for epoch in range(EPOCHS):
-            print(f'Epoch : {epoch}')
+            logger.info(f'Epoch : {epoch}')
             model.train()
             trainTracker.reset()
             valTracker.reset()
-            for images, labels in tqdm(trainLoader, desc = "Training"):
+            for images, labels, indices in tqdm(trainLoader, desc = "Training"):
                 images, labels = images.to(device), labels.to(device)
+                expandedImages, expandedLabels = expander.sample(labels = labels, indices = indices)
+
                 optimizer.zero_grad()
 
-                outputs, embeddings = model(images)
-                cLoss   = classificationCriterion(outputs , labels)
-                triplets = mineTriplets(embeddings = embeddings, labels = labels)
+                outputs, anchors = model(images)
+                _ , pools        = model(expandedImages)
+                triplets = mineTriplets(anchors = anchors, anchorLabels = labels, pools = pools, poolLabels = expandedLabels)
                 if triplets:
-                    anchors = embeddings[[t[0] for t in triplets]]
-                    positives = embeddings[[t[1] for t in triplets]]
-                    negatives = embeddings[[t[2] for t in triplets]]
-                    tLoss = verificationCriterion(anchors, positives, negatives)
+                    anchors     = triplets['anchors']
+                    positives   = triplets['positives']
+                    negatives   = triplets['negatives']
+                    tLoss       = verificationCriterion(anchors, positives, negatives)
                 else : 
-                    tLoss = 0
-                loss = cLoss + tLoss
+                    tLoss = torch.tensor(0.0, device=device)
+                cLoss   = classificationCriterion(outputs , labels)
+                loss    = cLoss + tLoss
                 
                 loss.backward()
                 optimizer.step()
@@ -109,7 +111,7 @@ if __name__ == '__main__':
 
             model.eval()
             with torch.no_grad():
-                for images, labels in tqdm(valLoader, desc="Validating"):
+                for images, labels, indices in tqdm(valLoader, desc="Validating"):
                     images, labels = images.to(device), labels.to(device)
                     outputs, embeddings = model(images)
                     cLoss = classificationCriterion(outputs, labels)

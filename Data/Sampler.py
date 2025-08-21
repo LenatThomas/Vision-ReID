@@ -29,11 +29,10 @@ class PKBatchExpander:
             reject = indices[i]
             selected = self._rejectSampler(samples, reject, self._k)
             for k in selected:
-                x , y , z = self._dataset[k]
+                x , y , _ = self._dataset[k]
                 batch.append(x)
                 batchLabels.append(y)
-                batchIndexes.append(z)
-        return torch.stack(batch) , torch.tensor(batchLabels) , torch.tensor(batchIndexes)
+        return torch.stack(batch) , torch.tensor(batchLabels)
             
 class PKSampler(Sampler):
     def __init__(self , dataset, indices = None , p = 16 , k = 4):

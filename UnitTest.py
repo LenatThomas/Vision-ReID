@@ -1,11 +1,12 @@
 import os 
 import torch
 from pathlib import Path
+from Model.Vit import VIT
 from dotenv import load_dotenv
 from Data.Dataset import ReIDset
 from Utils.Logger import setupLogger
-from Model.Vit import VIT
-from Data.Sampler import PKBatchExpander, mineTriplets
+from Data.Losses import mineTriplets
+from Data.Sampler import PKBatchExpander
 from torch.utils.data import DataLoader, random_split
 from torchvision.transforms import Compose, Resize, ToTensor, RandomHorizontalFlip, Normalize
 
@@ -37,10 +38,9 @@ loader = DataLoader(dataset = train, num_workers = 4, batch_size = BATCHSIZE)
 expander = PKBatchExpander(dataset = dataset, k = 4)
 model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
 for images , labels, indices in loader:
-    expandedBatch, expandedLabels, expandedIndex = expander.sample(indices = indices, labels = labels)
+    expandedBatch, expandedLabels = expander.sample(indices = indices, labels = labels)
     logger.info(indices)
     logger.info(labels)
-    logger.info(expandedIndex)
     logger.info(expandedLabels)
     _, anchors = model(images)
     _, pools   = model(expandedBatch)
