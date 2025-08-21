@@ -1,7 +1,40 @@
 import math
 import random
+import numpy as np
+import torch
 from torch.utils.data import Sampler
 
+class PKBatchExpander:
+    def __init__(self, dataset, k = 2):
+        assert k > 1 
+        self._k = k
+        self._dataset = dataset
+        self._dict = dataset.labelDict
+
+    def _rejectSampler(self, list, excluded , n ):
+        sampleSpace = [item for item in list if item != excluded]
+        if len(sampleSpace) == 0:
+            return []
+        elif len(sampleSpace) < n :
+            return random.choices(sampleSpace, k = n)
+        return random.sample(sampleSpace , k = n) 
+
+    def sample(self, labels, indices):
+        batch = []
+        batchLabels = []
+        batchIndexes = []
+        for i , label in enumerate(labels):
+            label = label.item() if torch.is_tensor(label) else label
+            samples = self._dict[label]
+            reject = indices[i]
+            selected = self._rejectSampler(samples, reject, self._k)
+            for k in selected:
+                x , y , z = self._dataset[k]
+                batch.append(x)
+                batchLabels.append(y)
+                batchIndexes.append(z)
+        return torch.stack(batch) , torch.tensor(batchLabels) , torch.tensor(batchIndexes)
+            
 class PKSampler(Sampler):
     def __init__(self , dataset, indices = None , p = 16 , k = 4):
         self._p = p

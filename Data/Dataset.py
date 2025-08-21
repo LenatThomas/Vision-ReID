@@ -31,10 +31,10 @@ class ReIDset():
     
     def _buildDict(self):
         self._dict = {}
-        for index , label in enumerate(self._pids):
-            if label not in self._dict.keys():
-                self._dict[label] = []
-            self._dict[label].append(index)
+        for index , pid in enumerate(self._pids):
+            if self._labels[pid] not in self._dict.keys():
+                self._dict[self._labels[pid]] = []
+            self._dict[self._labels[pid]].append(index)
     
     def __getitem__(self, index):
         if index >= self._length or index < 0:
@@ -44,7 +44,7 @@ class ReIDset():
         image = self._transform(image)
         pid = self._pids[index]
         label = self._labels[pid]
-        return image, label
+        return image, label, index
     
     def __len__(self):
         return self._length
@@ -65,6 +65,14 @@ class ReIDset():
             return image, label
         else :
             raise StopIteration
+        
+    @property
+    def pid2label(self):
+        return self._labels
+
+    @property
+    def label2pid(self):
+        return {value: key for key , value in self._labels.items()}
         
     @property
     def pids(self):
