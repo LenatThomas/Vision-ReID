@@ -22,8 +22,8 @@ load_dotenv()
 EPOCHS = 10
 LEARNING_RATE = 3e-4
 VERSION = 'VIT 1.0'
-P = 10
-K = 3
+P = 32
+K = 4
 BATCHSIZE = P * K
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,14 +34,14 @@ logFile.parent.mkdir(exist_ok=True)
 modelFile.parent.mkdir(exist_ok = True)
 logger = setupLogger(logFile = logFile)
 
-logger.info(f"PyTorch Version: {torch.__version__}")
 logger.info(f"System: {platform.platform()}")
 logger.info(f"Python Version: {platform.python_version()}")
+logger.info(f"PyTorch Version: {torch.__version__}")
 if torch.cuda.is_available():
     logger.info(f"CUDA Available: {True}")
     logger.info(f"CUDA Version: {torch.version.cuda}")
-logger.info(f"Using model {VERSION}")
 logger.info(f"Using device {device}")
+logger.info(f"Using model {VERSION}")
 logger.info(f"Hyperparameters: EPOCHS = {EPOCHS}, BATCHSIZE = {BATCHSIZE}, P = {P}, K = {K}, LR = {LEARNING_RATE}")
 
 
