@@ -16,24 +16,27 @@ from Data.Sampler import PKSampler, PKBatchExpander
 from Data.Losses import mineTriplets
 from Utils.Logger import setupLogger
 from Utils.Tracker import TrainingTracker
+from torch.amp import GradScaler, autocast
+from config import Config as C
 
 load_dotenv()
 
-EPOCHS = 10
-LEARNING_RATE = 3e-4
-VERSION = 'VIT 1.1'
-P = 32
-K = 5
-BATCHSIZE = P * K
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logFile = Path(os.getenv("SAVE_PATH"))/ f"logs/{VERSION}.txt"
-modelFile = Path(os.getenv("SAVE_PATH"))/ f"models/{VERSION}.pth"
-dataPath = Path(os.getenv("SAVE_PATH"))/ f"datasets/market1501/bounding_box_train/"
+VERSION         = C.VERSION
+EPOCHS          = C.EPOCHS
+LEARNING_RATE   = C.LEARNING_RATE
+PATIENCE        = C.PATIENCE
+CLIP            = C.CLIP
+RESUME          = C.RESUME
+P, K, BATCHSIZE = C.P, C.K, C.BATCHSIZE
+logFile         = C.logFile
+modelFile       = C.modelFile
+dataPath        = C.dataPath
+device          = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logFile.parent.mkdir(exist_ok=True)
 modelFile.parent.mkdir(exist_ok = True)
-logger = setupLogger(logFile = logFile)
 
+
+logger = setupLogger(logFile = logFile)
 logger.info(f"System: {platform.platform()}")
 logger.info(f"Python Version: {platform.python_version()}")
 logger.info(f"PyTorch Version: {torch.__version__}")
@@ -73,13 +76,27 @@ if __name__ == '__main__':
             raise ValueError("DataLoader is empty")
         
         logger.info("Initialization Done")
+
+
         bestAccuracy = 0.0
+        NoImprovements = 0
+        scaler = GradScaler(device = device)
         trainTracker = TrainingTracker()
         valTracker   = TrainingTracker()
 
+        if RESUME and modelFile.exists():
+            checkpoint = torch.load(modelFile, map_location=device)
+            model.load_state_dict(checkpoint['model_state'])
+            optimizer.load_state_dict(checkpoint['optimizer_state'])
+            bestAccuracy = checkpoint.get('bestAccuracy', 0.0)
+            startEpoch = checkpoint.get('epoch', 0) + 1
+            logger.info(f"Resumed from checkpoint at epoch {startEpoch} with best accuracy {bestAccuracy:.4f}")
+        else:
+            startEpoch = 0
+
         startTime = datetime.now()
-        logger.info(f'Training Started at {startTime}')
-        for epoch in range(EPOCHS):
+        logger.info('Training Started')
+        for epoch in range(startEpoch, EPOCHS):
             logger.info(f'Epoch : {epoch}')
             model.train()
             trainTracker.reset()
@@ -90,21 +107,24 @@ if __name__ == '__main__':
 
                 optimizer.zero_grad()
 
-                outputs, anchors = model(images)
-                _ , pools        = model(expandedImages)
-                triplets = mineTriplets(anchors = anchors, anchorLabels = labels, pools = pools, poolLabels = expandedLabels)
-                if triplets:
-                    anchors     = triplets['anchors']
-                    positives   = triplets['positives']
-                    negatives   = triplets['negatives']
-                    tLoss       = verificationCriterion(anchors, positives, negatives)
-                else : 
-                    tLoss = torch.tensor(0.0, device=device)
-                cLoss   = classificationCriterion(outputs , labels)
-                loss    = cLoss + tLoss
+                with autocast():
+                    outputs, anchors = model(images)
+                    _ , pools        = model(expandedImages)
+                    triplets = mineTriplets(anchors = anchors, anchorLabels = labels, pools = pools, poolLabels = expandedLabels)
+                    if triplets:
+                        anchors     = triplets['anchors']
+                        positives   = triplets['positives']
+                        negatives   = triplets['negatives']
+                        tLoss       = verificationCriterion(anchors, positives, negatives)
+                    else : 
+                        tLoss = torch.tensor(0.0, device=device)
+                    cLoss   = classificationCriterion(outputs , labels)
+                    loss    = cLoss + tLoss
                 
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)  # Gradient clipping
+                scaler.step(optimizer)
+                scaler.update()
                 _, predicted = torch.max(outputs, 1)
                 trainTracker.update(cLoss, batch = images.size(0) , predicted = predicted , labels = labels)
 
@@ -119,11 +139,25 @@ if __name__ == '__main__':
                     valTracker.update(cLoss, batch = images.size(0), predicted = predicted, labels = labels)
 
             logger.info(f'Epoch {epoch} Train Loss {trainTracker.loss:.6f} Train Accuracy {trainTracker.accuracy:.6f} Validation Loss {valTracker.loss:.6f} Validation Accuracy {valTracker.accuracy:.6f}')
+            
             if valTracker.accuracy > bestAccuracy:
                 bestAccuracy = valTracker.accuracy
-                torch.save(model.state_dict(), modelFile , pickle_protocol = 4)
-                logger.info("Accuracy Improved, best model saved")
-        logger.info(f'Training Ended at {datetime.now()}')
+                epochsWithoutImprovement = 0
+                torch.save({
+                    'epoch': epoch,
+                    'model_state': model.state_dict(),
+                    'optimizer_state': optimizer.state_dict(),
+                    'bestAccuracy': bestAccuracy
+                }, modelFile, pickle_protocol = 4)
+                logger.info("Accuracy Improved, checkpoint saved")
+            else:
+                epochsWithoutImprovement += 1
+                logger.info(f"No improvement for {epochsWithoutImprovement} epochs")
+                if epochsWithoutImprovement >= PATIENCE:
+                    logger.info(f"Early stopping triggered at epoch {epoch}")
+                    break
+
+        logger.info('Training Ended')
         logger.info(f'Training Duration = {datetime.now() - startTime}')
 
     except KeyboardInterrupt:
