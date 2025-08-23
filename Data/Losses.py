@@ -16,9 +16,9 @@ def mineTriplets(anchors , anchorLabels , pools , poolLabels):
         if posMask.sum() == 0 or negMask.sum() == 0:
             continue
         hardestNegative = pairwise[i][negMask].argmin()
-        hardestNegative = torch.nonzero(negMask, as_tuple=False)[hardestNegative]
+        hardestNegative = torch.nonzero(negMask, as_tuple=False)[hardestNegative].item()
         hardestPositive = pairwise[i][posMask].argmax()
-        hardestPositive = torch.nonzero(posMask, as_tuple=False)[hardestPositive]
+        hardestPositive = torch.nonzero(posMask, as_tuple=False)[hardestPositive].item()
         triplets['anchors'].append(anchor)
         triplets['positives'].append(pools[hardestPositive])
         triplets['negatives'].append(pools[hardestNegative])

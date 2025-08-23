@@ -102,12 +102,14 @@ if __name__ == '__main__':
             trainTracker.reset()
             valTracker.reset()
             for images, labels, indices in tqdm(trainLoader, desc = "Training"):
-                images, labels = images.to(device), labels.to(device)
+                images = images.to(device)
+                labels = labels.to(device)
                 expandedImages, expandedLabels = expander.sample(labels = labels, indices = indices)
-
+                expandedImages = expandedImages.to(device)
+                expandedLabels = expandedLabels.to(device)
                 optimizer.zero_grad()
 
-                with autocast():
+                with autocast(device_type = device.type):
                     outputs, anchors = model(images)
                     _ , pools        = model(expandedImages)
                     triplets = mineTriplets(anchors = anchors, anchorLabels = labels, pools = pools, poolLabels = expandedLabels)

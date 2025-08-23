@@ -13,8 +13,8 @@ class Config:
     PATIENCE = 20
     CLIP = 1.0
     RESUME = False
-    P = 4
-    K = 4
+    P = 128
+    K = 6
     BATCHSIZE = P * K
 
     logFile   = SAVE_PATH / f"logs/{VERSION}.txt"
