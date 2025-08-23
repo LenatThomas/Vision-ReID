@@ -65,7 +65,12 @@ class ReIDset():
             return image, label
         else :
             raise StopIteration
-        
+
+    def filename(self, index):
+        if index >= self._length or index < 0:
+            raise IndexError('Index out of range')
+        return self._paths[index]       
+
     @property
     def pid2label(self):
         return self._labels
