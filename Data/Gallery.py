@@ -16,9 +16,9 @@ class Gallery :
         return self._features is not None
     
     def _clear(self):
-        self._features = []
-        self._labels = []
-        self._filenames = []
+        self._features  = None
+        self._labels    = None
+        self._filenames = None
         
     def build(self, dataset , model):
         self._clear()
@@ -27,7 +27,7 @@ class Gallery :
         loader = DataLoader(dataset = dataset, batch_size = 128, num_workers = 4)
         features, targets, filenames = [], [], []
         with torch.no_grad():
-            for images, labels, indices in tqdm(loader, desc = 'Building Dictionary'):
+            for images, labels, indices in tqdm(loader, desc = 'Building Gallery'):
                 images = images.to(self._device)
                 _, embeddings = self._model(images)
                 features.append(embeddings.cpu())

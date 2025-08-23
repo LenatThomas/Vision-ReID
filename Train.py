@@ -144,7 +144,7 @@ if __name__ == '__main__':
             
             if valTracker.accuracy > bestAccuracy:
                 bestAccuracy = valTracker.accuracy
-                epochsWithoutImprovement = 0
+                NoImprovements = 0
                 torch.save({
                     'epoch': epoch,
                     'model_state': model.state_dict(),
@@ -153,9 +153,9 @@ if __name__ == '__main__':
                 }, modelFile, pickle_protocol = 4)
                 logger.info("Accuracy Improved, checkpoint saved")
             else:
-                epochsWithoutImprovement += 1
-                logger.info(f"No improvement for {epochsWithoutImprovement} epochs")
-                if epochsWithoutImprovement >= PATIENCE:
+                NoImprovements += 1
+                logger.info(f"No improvement for {NoImprovements} epochs")
+                if NoImprovements >= PATIENCE:
                     logger.info(f"Early stopping triggered at epoch {epoch}")
                     break
 

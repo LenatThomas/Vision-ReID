@@ -66,7 +66,7 @@ class ReIDset():
         else :
             raise StopIteration
 
-    def filename(self, index):
+    def fileName(self, index):
         if index >= self._length or index < 0:
             raise IndexError('Index out of range')
         return self._paths[index]       
