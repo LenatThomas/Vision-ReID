@@ -12,7 +12,6 @@ class ReIDset():
         self._length = len(self._paths)
         self._pids = [self._extractInfo(fname)[0] for fname in self._paths]
         self._cids = [self._extractInfo(fname)[1] for fname in self._paths]
-        self._labels = {pid : idx for idx, pid in enumerate(sorted(set(self._pids)))}
         self._transform = transform or T.Compose([
             T.Resize((256, 128)),
             T.RandomHorizontalFlip(),
@@ -23,25 +22,18 @@ class ReIDset():
         self._dict = {}
         self._buildDict()
 
-    @property
-    def labels(self):
-        return self._labels
-    
-    def setLabels(self, labels):
-        self._labels = labels
-
     def _extractInfo(self, fname):
         splits = fname.split('_')
-        pid    = splits[0]
+        pid    = int(splits[0])
         cid    = splits[1]
         return (pid , cid)
     
     def _buildDict(self):
         self._dict = {}
         for index , pid in enumerate(self._pids):
-            if self._labels[pid] not in self._dict.keys():
-                self._dict[self._labels[pid]] = []
-            self._dict[self._labels[pid]].append(index)
+            if pid not in self._dict.keys():
+                self._dict[pid] = []
+            self._dict[pid].append(index)
     
     def __getitem__(self, index):
         if index >= self._length or index < 0:
@@ -50,8 +42,7 @@ class ReIDset():
         image = Image.open(fname).convert('RGB')
         image = self._transform(image)
         pid = self._pids[index]
-        label = self._labels[pid]
-        return image, label, index
+        return image, pid, index
     
     def __len__(self):
         return self._length
@@ -68,8 +59,7 @@ class ReIDset():
             image = Image.open(fname).convert('RGB')
             image = self._transform(image)
             pid = self._pids[index]
-            label = self._labels[pid]
-            return image, label
+            return image, pid
         else :
             raise StopIteration
 
@@ -77,14 +67,6 @@ class ReIDset():
         if index >= self._length or index < 0:
             raise IndexError('Index out of range')
         return self._paths[index]       
-
-    @property
-    def pid2label(self):
-        return self._labels
-
-    @property
-    def label2pid(self):
-        return {value: key for key , value in self._labels.items()}
         
     @property
     def pids(self):
@@ -96,4 +78,4 @@ class ReIDset():
 
     @property
     def nClasses(self):
-        return len(self._labels.keys())
+        return len(self._pids.keys())
