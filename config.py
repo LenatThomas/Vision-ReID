@@ -22,3 +22,4 @@ class Config:
     dataPath    = SOURCE / "datasets/market1501/bounding_box_train/"
     galleryPath = SOURCE / "gallery/gallery.pth"
     queryPath   = SOURCE / "datasets/market1501/query/"
+    gtPath      = SOURCE / "datasets/market1501/gt_bbox/"

@@ -78,4 +78,4 @@ class ReIDset():
 
     @property
     def nClasses(self):
-        return len(self._pids.keys())
+        return len(self._dict.keys())

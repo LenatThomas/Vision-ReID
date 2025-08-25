@@ -19,29 +19,31 @@ load_dotenv()
 
 VERSION = 'Unit Test'
 BATCHSIZE = 128
-logFile = Path(os.getenv("SAVE_PATH"))/ f"logs/{VERSION}.txt"
-logFile.parent.mkdir(exist_ok=True)
 
-dataPath = Path(os.getenv("SAVE_PATH"))/ f"datasets/market1501/bounding_box_train/"
-savePath = Path(os.getenv("SAVE_PATH"))/ f"gallery/gallery.pth"
+logFile = Path(os.getenv("SOURCE"))/ f"logs/{VERSION}.txt"
+logFile.parent.mkdir(exist_ok=True)
+gtPath      = C.gtPath
+dataPath    = C.dataPath
+galleryPath = C.galleryPath
 logger = setupLogger(logFile = logFile)
 
 transform = Compose([
             Resize((256, 128)),
             ToTensor(),
-            RandomHorizontalFlip(),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-dataset = ReIDset(directory = dataPath, transform = transform)
+dataset     = ReIDset(directory = dataPath, transform = transform)
+gtset       = ReIDset(directory = gtPath, transform = transform)
 model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
 checkpoint = torch.load(modelFile, map_location=device)
 model.load_state_dict(checkpoint['model_state'])
 model.to(device)
+
 gallery = Gallery(device = device)
-gallery.build(model = model , dataset = dataset)
-gallery.save(savePath)
+gallery.build(model = model , dataset = gtset)
+gallery.save(galleryPath)
 
 

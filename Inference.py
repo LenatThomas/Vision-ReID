@@ -20,8 +20,7 @@ SOURCE = Path(os.getenv("SOURCE", "./outputs"))
 logFile = SOURCE / f"logs/inference.txt"
 logger = setupLogger(logFile = logFile)
 
-rePath      = C.dataPath
-dataPath    = C.queryPath
+queryPath   = C.queryPath
 modelPath   = C.modelFile
 galleryPath = C.galleryPath
 
@@ -36,10 +35,7 @@ transform = Compose([
 logger.info(f"Using device {device.type}")
 logger.info(f"Using model {VERSION}")
 
-query       = ReIDset(dataPath, transform=transform)
-redat       = ReIDset(rePath  , transform=transform)
-queryDict   = query.label2pid
-redatDict   = redat.label2pid
+query       = ReIDset(queryPath, transform=transform)
 trainSize   = int(0.9 * len(query))
 valSize     = len(query) - trainSize
 train , val = random_split(query, [trainSize , valSize])
@@ -62,13 +58,9 @@ for images, labels, indices in tqdm(loader, desc = 'Testing...'):
     _, embeddings = model(images)
     batchResults = gallery.search(embeddings, topK = 10)
     results.extend(batchResults)
-    print(len(results))
-    print(query.label2pid[labels[0].item()])
-    for i in batchResults[0]:
-        print(i)
     for i in batchResults:
-        predicted.append([redatDict[k['label']] for k in i])
-    targets.extend(queryDict[k.item()] for k in labels)
+        predicted.append([k['label'] for k in i])
+    targets.extend([k.item() for k in labels])
 
 
 ks = [1 , 2 , 3 , 5 , 10]
