@@ -23,6 +23,13 @@ class ReIDset():
         self._dict = {}
         self._buildDict()
 
+    @property
+    def labels(self):
+        return self._labels
+    
+    def setLabels(self, labels):
+        self._labels = labels
+
     def _extractInfo(self, fname):
         splits = fname.split('_')
         pid    = splits[0]

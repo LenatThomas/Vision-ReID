@@ -12,7 +12,8 @@ from torch.optim import AdamW
 from torch import nn 
 from Model.Vit import VIT
 from Data.Dataset import ReIDset
-from Data.Sampler import PKSampler, PKBatchExpander
+from Data.Sampler import PKBatchExpander
+from Data.Gallery import Gallery
 from Data.Losses import mineTriplets
 from Utils.Logger import setupLogger
 from Utils.Tracker import TrainingTracker
@@ -31,6 +32,7 @@ P, K, BATCHSIZE = C.P, C.K, C.BATCHSIZE
 logFile         = C.logFile
 modelFile       = C.modelFile
 dataPath        = C.dataPath
+galleryPath     = C.galleryPath
 device          = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logFile.parent.mkdir(exist_ok=True)
 modelFile.parent.mkdir(exist_ok = True)
@@ -43,7 +45,7 @@ logger.info(f"PyTorch Version: {torch.__version__}")
 if torch.cuda.is_available():
     logger.info(f"CUDA Available: {True}")
     logger.info(f"CUDA Version: {torch.version.cuda}")
-logger.info(f"Using device {device}")
+logger.info(f"Using device {device.type}")
 logger.info(f"Using model {VERSION}")
 logger.info(f"Hyperparameters: EPOCHS = {EPOCHS}, BATCHSIZE = {BATCHSIZE}, P = {P}, K = {K}, LR = {LEARNING_RATE}")
 
@@ -161,6 +163,11 @@ if __name__ == '__main__':
 
         logger.info('Training Ended')
         logger.info(f'Training Duration = {datetime.now() - startTime}')
+        logger.info('Building Gallery')
+        gallery = Gallery
+        gallery.build(model = model, dataset = dataset)
+        gallery.save(galleryPath)
+        logger.info(f'Gallery Saved to {galleryPath}')
 
     except KeyboardInterrupt:
         logger.warning('Training Interrupted by user')

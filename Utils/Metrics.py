@@ -1,23 +1,30 @@
 from sklearn.metrics import average_precision_score
 import torch.nn.functional as F
 
-def rankK(outputs, labels, ks = [1, 5]):
-    k = max(ks)
-    _, pred = outputs.topk(k, dim = 1, largest=True, sorted=True)  
-    pred = pred.t() 
-    correct = pred.eq(labels.view(1, -1).expand_as(pred)) 
-    results = {}
-    for k in ks:
-        results[f"Rank-{k}"] = correct[:k].reshape(-1).float().sum(0).item() / labels.size(0)
-    return results
+
+def rankK(predictions , targets, ks = [1 , 2 , 3 , 5]):
+    ks = sorted(ks)
+    kHits = {k : 0 for k in ks}
+    nQueries = len(predictions)
+    for i in range(nQueries):
+        p = predictions[i]
+        t = targets[i]
+        for k in ks:
+            if t in p[:k]:
+                kHits[k] += 1
+    rankAccuracy = {k: kHits[k] / nQueries for k in ks}
+    return rankAccuracy
+    
+def averagePrecision(predictions , target):
+    precision   = []
+    relevant    = 0
+    for i , p in enumerate(predictions, start = 1):
+        if p == target:
+            relevant += 1
+            precision.append(relevant / i)
+    return sum(precision) / len(precision) if precision else 0.0
 
 
-def mAP(outputs, labels, nClasses):
-    probs = F.softmax(outputs, dim = 1).cpu().numpy()
-    labelsOnehot = F.one_hot(labels, num_classes = nClasses).cpu().numpy()
-    APs = []
-    for c in range(nClasses):
-        if labelsOnehot[:, c].sum() == 0:
-            continue
-        APs.append(average_precision_score(labelsOnehot[:, c], probs[:, c]))
-    return sum(APs) / len(APs) if APs else 0.0
+def mAP(predictions , targets):
+    precisions = [averagePrecision(predictions[i] , targets[i]) for i in range(len(predictions))]
+    return sum(precisions) / len(precisions)

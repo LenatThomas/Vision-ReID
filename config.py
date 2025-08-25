@@ -6,7 +6,7 @@ load_dotenv()
 
 class Config:
     VERSION = "VIT 1.1"
-    SAVE_PATH = Path(os.getenv("SAVE_PATH", "./outputs"))
+    SOURCE = Path(os.getenv("SOURCE", "./outputs"))
 
     EPOCHS = 80
     LEARNING_RATE = 3e-4
@@ -17,6 +17,8 @@ class Config:
     K = 6
     BATCHSIZE = P * K
 
-    logFile   = SAVE_PATH / f"logs/{VERSION}.txt"
-    modelFile = SAVE_PATH / f"models/{VERSION}.pth"
-    dataPath  = SAVE_PATH / "datasets/market1501/bounding_box_train/"
+    logFile     = SOURCE / f"logs/{VERSION}.txt"
+    modelFile   = SOURCE / f"models/{VERSION}.pth"
+    dataPath    = SOURCE / "datasets/market1501/bounding_box_train/"
+    galleryPath = SOURCE / "gallery/gallery.pth"
+    queryPath   = SOURCE / "datasets/market1501/query/"
