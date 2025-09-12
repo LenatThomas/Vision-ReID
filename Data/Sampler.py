@@ -9,7 +9,7 @@ class PKBatchExpander:
         assert k > 1 
         self._k = k
         self._dataset = dataset
-        self._dict = dataset.labelDict
+        self._dict = dataset.indexMap
 
     def _rejectSampler(self, list, excluded , n ):
         sampleSpace = [item for item in list if item != excluded]
@@ -45,7 +45,7 @@ class PKSampler(Sampler):
 
     def _reset(self):
         self._labelDict = {}
-        for label, indices in self._dataset.labelDict.items():
+        for label, indices in self._dataset.indexMap.items():
             filtered = [i for i in indices if i in self._indices]
             if filtered:
                 self._labelDict[label] = filtered

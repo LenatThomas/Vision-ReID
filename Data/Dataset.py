@@ -73,7 +73,7 @@ class ReIDset():
         return self._pids
         
     @property
-    def labelDict(self):
+    def indexMap(self):
         return self._dict
 
     @property
