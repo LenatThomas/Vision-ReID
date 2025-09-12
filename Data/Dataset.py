@@ -2,7 +2,8 @@ import os
 import numpy as np
 import torchvision.transforms as T
 from PIL import Image
-from Templates import ReidentificationDataset
+from Templates import ReidentificationDataset, SearchDataset
+from scipy.io import loadmat
 
 class Market1501IdentificationSet(ReidentificationDataset):
     def __init__(self, root, transform = None):
@@ -49,3 +50,113 @@ class Market1501IdentificationSet(ReidentificationDataset):
         if not (0 <= index < self._length):
             raise IndexError('Index out of range')
         return self._paths[index]       
+    
+class CuhkSysuIdentificationSet(ReidentificationDataset):
+    def __init__(self, root , split = 'Train.mat', transform = None):
+        super.__init__(root, transform or T.Compose([
+            T.Resize((256, 128)),
+            T.RandomHorizontalFlip(),
+            T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]))
+        self._annotationDir = os.path.join(root, 'annotation', 'test' , 'train_test', split)
+        self._imageDir = os.path.join(root, 'Image', 'SSM')
+        self._raw = loadmat(self._annotationDir, squeeze_me=True, struct_as_record=False)
+        self._mat = self._raw[list(self._raw.keys())[-1]]
+        self._length = 0
+        self._crops = []
+        self._build()
+
+    def _unpack(self, index):
+        row     = self._mat[index]
+        pid     = row.idname
+        scene   = []
+        for s in row.scene:
+            imname   = s.imname
+            box     = s.idlocate
+            scene.append((imname, pid, box))
+        return scene
+
+    def _buildDict(self):
+        self._dict = {}
+        for index, pid in enumerate(self._pids):
+            if pid not in self._dict.keys():
+                self._dict[pid] = []
+            self._dict[pid].append(index)
+
+    def _build(self):
+        self._crops = []
+        for i in range(len(self._mat)):
+            self._crops.extend(self._unpack(i))
+        self._length = len(self._crops)
+        self._pids = [i[1] for i in self._crops]
+        self._nClasses = len(set(self._pids))
+        self._buildDict()
+         
+    def __getitem__(self, index):
+        if not (0 <= index < self._length):
+            raise IndexError(f"Index {index} out of range of length {self._length}")
+        imname = self._crops[index][0]
+        pid    = self._crops[index][1]
+        imagePath = os.path.join(self._imageDir, f'{imname}.jpg')
+        image = Image.open(imagePath).convert('RGB')
+        x, y, w, h    = self._crops[index][2]
+        width, height = image.size
+        x1, y1 = max(0, x), max(0, y)
+        x2, y2 = min(width, x+w), min(height, y+h)
+        crop = image.crop((x1, y1 , x2 , y2))
+        crop = self._transform(crop)
+        return crop, pid, index
+
+    def fileName(self, index):
+        if not (0 <= index < self._length):
+            raise IndexError('Index out of range')
+        imname = self._crops[index][0]
+        pid = self._crops[index][1]
+        return f'{imname}_{pid}'
+
+    def __len__(self):
+        return self._length
+
+class CuhkSysuSearchSet(SearchDataset):
+    def __init__(self, root, split = 'Train.mat' ,transform = None):
+        super().__init__(root, transform)
+        self._annotationDir = os.path.join(root, 'annotation', 'test' , 'train_test', split)
+        self._imageDir = os.path.join(root, 'Image', 'SSM')
+        self._raw = loadmat(self._annotationDir, squeeze_me=True, struct_as_record=False)
+        self._mat = self._raw[list(self._raw.keys())[-1]]
+        self._crops = []
+        self._buildMapping()
+
+    def _unpack(self, index):
+        row     = self._mat[index]
+        scene   = []
+        for s in row.scene:
+            imname   = s.imname
+            box     = s.idlocate
+            scene.append((imname, box))
+        return scene
+
+    def _buildMapping(self):
+        self._crops = []
+        for i in range(len(self._mat)):
+            self._crops.extend(self._unpack(i))
+        self._length = len(self._crops)
+        self._nImages = len(set(c[0] for c in self._crops))
+        self._cropMaps = self._crops
+
+    def __getitem__(self, index):
+        imname = self._crops[index][0]
+        box    = self._crops[index][1]
+        imagePath = os.path.join(self._imageDir, f'{imname}.jpg')
+        image = Image.open(imagePath).convert('RGB')
+        x, y, w, h    = self._crops[index][2]
+        width, height = image.size
+        x1, y1 = max(0, x), max(0, y)
+        x2, y2 = min(width, x+w), min(height, y+h)
+        crop = image.crop((x1, y1 , x2 , y2))
+        crop = self._transform(crop)
+        return crop, imname, box
+
+        
+
