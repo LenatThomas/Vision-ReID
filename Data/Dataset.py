@@ -2,18 +2,18 @@ import os
 import numpy as np
 import torchvision.transforms as T
 from PIL import Image
-from Templates import ReidentificationDataset, SearchDataset
+from Data.Templates import ReidentificationDataset, SearchDataset
 from scipy.io import loadmat
 
 class Market1501IdentificationSet(ReidentificationDataset):
-    def __init__(self, root, transform = None):
+    def __init__(self, root, split = "bounding_box_train",transform = None):
         super().__init__(root, transform or T.Compose([
             T.Resize((256, 128)),
             T.RandomHorizontalFlip(),
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ]))
-        self._imageDir = os.path.join(self._root, "bounding_box_train")
+        self._imageDir = os.path.join(self._root, split)
         self._paths = [fname for fname in os.listdir(self._imageDir) if fname.lower().endswith(('.jpg', '.jpeg'))]
         self._length = len(self._paths)
         self._pids = [self._extractInfo(fname)[0] for fname in self._paths]
@@ -53,7 +53,7 @@ class Market1501IdentificationSet(ReidentificationDataset):
     
 class CuhkSysuIdentificationSet(ReidentificationDataset):
     def __init__(self, root , split = 'Train.mat', transform = None):
-        super.__init__(root, transform or T.Compose([
+        super().__init__(root, transform or T.Compose([
             T.Resize((256, 128)),
             T.RandomHorizontalFlip(),
             T.ToTensor(),
@@ -73,7 +73,7 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
         scene   = []
         for s in row.scene:
             imname   = s.imname
-            box     = s.idlocate
+            box     = np.array(s.idlocate, dtype = np.int32)
             scene.append((imname, pid, box))
         return scene
 
@@ -90,7 +90,6 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
             self._crops.extend(self._unpack(i))
         self._length = len(self._crops)
         self._pids = [i[1] for i in self._crops]
-        self._nClasses = len(set(self._pids))
         self._buildDict()
          
     def __getitem__(self, index):
@@ -98,25 +97,27 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
             raise IndexError(f"Index {index} out of range of length {self._length}")
         imname = self._crops[index][0]
         pid    = self._crops[index][1]
-        imagePath = os.path.join(self._imageDir, f'{imname}.jpg')
+        imagePath = os.path.join(self._imageDir, imname)
         image = Image.open(imagePath).convert('RGB')
         x, y, w, h    = self._crops[index][2]
         width, height = image.size
         x1, y1 = max(0, x), max(0, y)
-        x2, y2 = min(width, x+w), min(height, y+h)
+        x2, y2 = min(width, x + w), min(height, y + h)
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError(
+                f"Invalid bounding box for {imname}: "
+                f"(x={x}, y={y}, w={w}, h={h}, img_size=({width},{height}))"
+            )
         crop = image.crop((x1, y1 , x2 , y2))
         crop = self._transform(crop)
         return crop, pid, index
 
-    def fileName(self, index):
+    def filename(self, index):
         if not (0 <= index < self._length):
             raise IndexError('Index out of range')
         imname = self._crops[index][0]
         pid = self._crops[index][1]
         return f'{imname}_{pid}'
-
-    def __len__(self):
-        return self._length
 
 class CuhkSysuSearchSet(SearchDataset):
     def __init__(self, root, split = 'Train.mat' ,transform = None):
@@ -133,7 +134,7 @@ class CuhkSysuSearchSet(SearchDataset):
         scene   = []
         for s in row.scene:
             imname   = s.imname
-            box     = s.idlocate
+            box     = np.array(s.idlocate, dtype = np.int32)
             scene.append((imname, box))
         return scene
 
@@ -148,9 +149,9 @@ class CuhkSysuSearchSet(SearchDataset):
     def __getitem__(self, index):
         imname = self._crops[index][0]
         box    = self._crops[index][1]
-        imagePath = os.path.join(self._imageDir, f'{imname}.jpg')
+        imagePath = os.path.join(self._imageDir, imname)
         image = Image.open(imagePath).convert('RGB')
-        x, y, w, h    = self._crops[index][2]
+        x, y, w, h    = self._crops[index][1]
         width, height = image.size
         x1, y1 = max(0, x), max(0, y)
         x2, y2 = min(width, x+w), min(height, y+h)

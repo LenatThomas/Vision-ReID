@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    VERSION = "VIT 1.1"
+    VERSION = "Sysu 0.0"
     SOURCE = Path(os.getenv("SOURCE", "./outputs"))
 
     EPOCHS = 80
     LEARNING_RATE = 3e-4
-    PATIENCE = 20
+    PATIENCE = 5
     CLIP = 1.0
     RESUME = False
     P = 128
@@ -18,8 +18,8 @@ class Config:
     BATCHSIZE = P * K
 
     logFile     = SOURCE / f"logs/{VERSION}.txt"
-    modelFile   = SOURCE / f"models/{VERSION}.pth"
-    dataPath    = SOURCE / "datasets/market1501/"
-    galleryPath = SOURCE / "gallery/gallery.pth"
-    queryPath   = SOURCE / "datasets/market1501/query/"
-    gtPath      = SOURCE / "datasets/market1501/gt_bbox/"
+    modelPath   = SOURCE / f"models/{VERSION}.pth"
+    root        = SOURCE / "datasets/cuhksysu/cuhksysu/"
+    galleryPath = SOURCE / f"gallery/gallery_{VERSION}.pth"
+    split       = 'Train.mat'
+    

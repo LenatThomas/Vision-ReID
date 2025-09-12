@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 from Model.Vit import VIT
 from dotenv import load_dotenv
-from Data.Dataset import ReIDset
+from Data.Dataset import CuhkSysuSearchSet
 from Utils.Logger import setupLogger
 from Data.Losses import mineTriplets
 from Data.Sampler import PKBatchExpander
@@ -13,18 +13,12 @@ from config import Config as C
 from Data.Gallery import Gallery
 
 
-modelFile = C.modelFile
-
-load_dotenv()
-
-VERSION = 'Unit Test'
+VERSION = C.VERSION
 BATCHSIZE = 128
-
-logFile = Path(os.getenv("SOURCE"))/ f"logs/{VERSION}.txt"
+logFile = C.logFile
 logFile.parent.mkdir(exist_ok=True)
-gtPath      = C.gtPath
-dataPath    = C.dataPath
-galleryPath = C.galleryPath
+root    = C.root
+split = C.split
 logger = setupLogger(logFile = logFile)
 
 transform = Compose([
@@ -35,15 +29,6 @@ transform = Compose([
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-dataset     = ReIDset(directory = dataPath, transform = transform)
-gtset       = ReIDset(directory = gtPath, transform = transform)
-model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
-checkpoint = torch.load(modelFile, map_location=device)
-model.load_state_dict(checkpoint['model_state'])
-model.to(device)
-
-gallery = Gallery(device = device)
-gallery.build(model = model , dataset = gtset)
-gallery.save(galleryPath)
-
-
+dataset     = CuhkSysuSearchSet(root = root, split = split ,  transform = transform)
+for crop, imname, box in dataset:
+    print(imname, box)

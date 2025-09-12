@@ -23,7 +23,6 @@ class ReidentificationDataset(Dataset, ABC):
         """ Return (image, pid, index)"""
         pass
 
-    @abstractmethod
     def __len__(self):
         return self._length
 
@@ -74,7 +73,6 @@ class SearchDataset(Dataset, ABC):
     def __getitem__(self, index):
         pass
 
-    @abstractmethod
     def __len__(self):
         return self._length
     
