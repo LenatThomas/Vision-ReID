@@ -19,7 +19,7 @@ class Config:
 
     logFile     = SOURCE / f"logs/{VERSION}.txt"
     modelFile   = SOURCE / f"models/{VERSION}.pth"
-    dataPath    = SOURCE / "datasets/market1501/bounding_box_train/"
+    dataPath    = SOURCE / "datasets/market1501/"
     galleryPath = SOURCE / "gallery/gallery.pth"
     queryPath   = SOURCE / "datasets/market1501/query/"
     gtPath      = SOURCE / "datasets/market1501/gt_bbox/"

@@ -33,7 +33,7 @@ class Gallery :
                 features.append(embeddings.cpu())
                 targets.append(labels.cpu())
                 for index in indices:
-                    filenames.append(dataset.fileName(index))
+                    filenames.append(dataset.filename(index))
         self._features = torch.cat(features)
         self._labels = torch.cat(targets)
         self._filenames = filenames

@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, random_split
 from torch.optim import AdamW
 from torch import nn 
 from Model.Vit import VIT
-from Data.Dataset import ReIDset
+from Data.Dataset import Market1501IdentificationSet
 from Data.Sampler import PKBatchExpander
 from Data.Gallery import Gallery
 from Data.Losses import mineTriplets
@@ -60,7 +60,7 @@ if __name__ == '__main__':
             RandomHorizontalFlip(),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        dataset     = ReIDset(directory = dataPath , transform = transform)
+        dataset     = Market1501IdentificationSet(directory = dataPath , transform = transform)
         trainSize   = int(0.8 * len(dataset))
         valSize     = len(dataset) - trainSize
         train , val = random_split(dataset, [trainSize , valSize], generator = generator)
