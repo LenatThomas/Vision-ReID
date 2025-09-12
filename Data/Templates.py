@@ -11,6 +11,7 @@ class ReidentificationDataset(Dataset, ABC):
         self._pids = []
         self._indexMap = {}
         self._iterator = 0
+        self._length = 0
 
     @abstractmethod
     def _buildDict(self):
@@ -24,8 +25,7 @@ class ReidentificationDataset(Dataset, ABC):
 
     @abstractmethod
     def __len__(self):
-        """Return dataset length"""
-        pass
+        return self._length
 
     @abstractmethod
     def filename(self, index):
@@ -58,6 +58,52 @@ class ReidentificationDataset(Dataset, ABC):
 
     def __str__(self):
         return (f"{self.__class__.__name__} (root={self._root}, images={len(self)}, identities={self.nClasses})")
+    
+    def __repr__(self):
+        return str(self)
+    
+class SearchDataset(Dataset, ABC):
+    def __init__(self, root , transform):
+        self._root = root
+        self._transform = transform
+        self._cropMaps = {}
+        self._length = 0
+        self._iterator = 0
+
+    @abstractmethod
+    def __getitem__(self, index):
+        pass
+
+    @abstractmethod
+    def __len__(self):
+        return self._length
+    
+    @abstractmethod
+    def _buildMapping(self):
+        pass
+
+    @property
+    def nImages(self):
+        return self.nImages
+    
+    @property
+    def cropMaps(self):
+        return self._cropMaps
+    
+    def __iter__(self):
+        self._iterator = 0
+        return self
+    
+    def __next__(self):
+        if self._iterator <= len(self):
+            crops, imname, boxes = self.__getitem__(self._iterator)
+            self._iterator += 1
+            return crops, imname, boxes
+        else :
+            raise StopIteration
+        
+    def __str__(self):
+        return f'{self.__class__.__name__} ({len(self)})'
     
     def __repr__(self):
         return str(self)
