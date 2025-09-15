@@ -1,24 +1,23 @@
-import torch
-import torch.nn as nn
-import platform
 import os
-from datetime import datetime
-from dotenv import load_dotenv
+import torch
+import platform
+from torch import nn
 from tqdm import tqdm
 from pathlib import Path
-from torchvision.transforms import Compose, Resize, ToTensor, Normalize, RandomHorizontalFlip
-from torch.utils.data import DataLoader, random_split
+from datetime import datetime
 from torch.optim import AdamW
-from torch import nn 
-from Model.Vit import VIT
-from Data.Dataset import Market1501IdentificationSet
-from Data.Sampler import PKBatchExpander
+from config import Config as C
+from dotenv import load_dotenv
 from Data.Gallery import Gallery
 from Data.Losses import mineTriplets
 from Utils.Logger import setupLogger
+from Model.Vit import VIT, VITEmbedding
+from Data.Sampler import PKBatchExpander
 from Utils.Tracker import TrainingTracker
 from torch.amp import GradScaler, autocast
-from config import Config as C
+from Data.Dataset import CuhkSysuIdentificationSet
+from torch.utils.data import DataLoader, random_split
+from torchvision.transforms import Compose, Resize, ToTensor, Normalize, RandomHorizontalFlip 
 
 load_dotenv()
 
@@ -30,12 +29,14 @@ CLIP            = C.CLIP
 RESUME          = C.RESUME
 P, K, BATCHSIZE = C.P, C.K, C.BATCHSIZE
 logFile         = C.logFile
-modelFile       = C.modelFile
-dataPath        = C.dataPath
+modelPath       = C.modelPath
+checkPointPath  = modelPath.with_suffix('.ckpt')
+embeddingPath   = modelPath.with_suffix('.pt')
+root            = C.root
 galleryPath     = C.galleryPath
 device          = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logFile.parent.mkdir(exist_ok=True)
-modelFile.parent.mkdir(exist_ok = True)
+modelPath.parent.mkdir(exist_ok = True)
 
 
 logger = setupLogger(logFile = logFile)
@@ -49,29 +50,29 @@ logger.info(f"Using device {device.type}")
 logger.info(f"Using model {VERSION}")
 logger.info(f"Hyperparameters: EPOCHS = {EPOCHS}, BATCHSIZE = {BATCHSIZE}, P = {P}, K = {K}, LR = {LEARNING_RATE}")
 
-
 if __name__ == '__main__':
 
     try: 
         generator = torch.Generator().manual_seed(0)
         transform = Compose([
             Resize((256, 128)),
-            ToTensor(),
             RandomHorizontalFlip(),
+            ToTensor(),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        dataset     = Market1501IdentificationSet(directory = dataPath , transform = transform)
+        dataset     = CuhkSysuIdentificationSet(root = root, split = 'Train.mat' , transform = transform)
         trainSize   = int(0.8 * len(dataset))
         valSize     = len(dataset) - trainSize
         train , val = random_split(dataset, [trainSize , valSize], generator = generator)
-        trainLoader = DataLoader(dataset = train, num_workers = 4, batch_size = P, shuffle = True)
-        valLoader   = DataLoader(dataset = val, num_workers = 4, batch_size = P, shuffle = True)
+        trainLoader = DataLoader(dataset = train, num_workers = 2, batch_size = P, shuffle = True)
+        valLoader   = DataLoader(dataset = val, num_workers = 2, batch_size = P, shuffle = True)
         expander    = PKBatchExpander(dataset = dataset)
 
         model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
         classificationCriterion = nn.CrossEntropyLoss()
         verificationCriterion   = nn.TripletMarginLoss(margin = 0.3) 
         optimizer               = AdamW(model.parameters(), lr = LEARNING_RATE, weight_decay = 0.05)
+        logger.info(f"Dataset = {dataset.__class__.__name__}")
         logger.info(f"Criterion = [{classificationCriterion.__class__.__name__}, {verificationCriterion.__class__.__name__}] Optimizer = {optimizer.__class__.__name__} Sampler = {expander.__class__.__name__}")
         if len(trainLoader) == 0 or len(valLoader) == 0:
             logger.error("Empty DataLoader!")
@@ -86,8 +87,8 @@ if __name__ == '__main__':
         trainTracker = TrainingTracker()
         valTracker   = TrainingTracker()
 
-        if RESUME and modelFile.exists():
-            checkpoint = torch.load(modelFile, map_location=device)
+        if RESUME and checkPointPath.exists():
+            checkpoint = torch.load(checkPointPath, map_location=device)
             model.load_state_dict(checkpoint['model_state'])
             optimizer.load_state_dict(checkpoint['optimizer_state'])
             bestAccuracy = checkpoint.get('bestAccuracy', 0.0)
@@ -152,7 +153,7 @@ if __name__ == '__main__':
                     'model_state': model.state_dict(),
                     'optimizer_state': optimizer.state_dict(),
                     'bestAccuracy': bestAccuracy
-                }, modelFile, pickle_protocol = 4)
+                }, checkPointPath, pickle_protocol = 4)
                 logger.info("Accuracy Improved, checkpoint saved")
             else:
                 NoImprovements += 1
@@ -161,11 +162,17 @@ if __name__ == '__main__':
                     logger.info(f"Early stopping triggered at epoch {epoch}")
                     break
 
+        checkpoint = torch.load(checkPointPath, map_location=device)
+        bestModel = VIT(imageHeight=256, imageWidth=128, nClasses=dataset.nClasses).to(device)
+        bestModel.load_state_dict(checkpoint['model_state'])
+        embeddingModel = VITEmbedding(baseModel = bestModel)
+        torch.save(embeddingModel, embeddingPath)
+
         logger.info('Training Ended')
         logger.info(f'Training Duration = {datetime.now() - startTime}')
         logger.info('Building Gallery')
-        gallery = Gallery
-        gallery.build(model = model, dataset = dataset)
+        gallery = Gallery()
+        gallery.build(model = embeddingModel, dataset = dataset)
         gallery.save(galleryPath)
         logger.info(f'Gallery Saved to {galleryPath}')
 

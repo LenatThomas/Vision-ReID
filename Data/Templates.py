@@ -12,6 +12,8 @@ class ReidentificationDataset(Dataset, ABC):
         self._indexMap = {}
         self._iterator = 0
         self._length = 0
+        self._pid2Label = {}
+        self._label2Pid = {}
 
     @abstractmethod
     def _buildDict(self):
@@ -25,6 +27,11 @@ class ReidentificationDataset(Dataset, ABC):
 
     def __len__(self):
         return self._length
+    
+    def _buildMap(self):
+        uniquePids = sorted(set(self._pids))
+        self._pid2Label = {pid : label for label, pid in enumerate(uniquePids)}
+        self._label2Pid = {label : pid for pid, label in self._pid2Label.items()}
 
     @abstractmethod
     def filename(self, index):
@@ -42,6 +49,14 @@ class ReidentificationDataset(Dataset, ABC):
     @property
     def nClasses(self):
         return len(set(self._pids))
+    
+    @property
+    def labelMap(self):
+        return self._pid2Label
+    
+    @property
+    def pidMap(self):
+        return self._label2Pid
     
     def __iter__(self):
         self._iterator = 0

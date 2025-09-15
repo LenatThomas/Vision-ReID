@@ -29,7 +29,7 @@ class Gallery :
         with torch.no_grad():
             for images, labels, indices in tqdm(loader, desc = 'Building Gallery'):
                 images = images.to(self._device)
-                _, embeddings = self._model(images)
+                embeddings = self._model(images)
                 features.append(embeddings.cpu())
                 targets.append(labels.cpu())
                 for index in indices:

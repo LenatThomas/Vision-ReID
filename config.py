@@ -18,7 +18,7 @@ class Config:
     BATCHSIZE = P * K
 
     logFile     = SOURCE / f"logs/{VERSION}.txt"
-    modelPath   = SOURCE / f"models/{VERSION}.pth"
+    modelPath   = SOURCE / f"models/{VERSION}"
     root        = SOURCE / "datasets/cuhksysu/cuhksysu/"
     galleryPath = SOURCE / f"gallery/gallery_{VERSION}.pth"
     split       = 'Train.mat'

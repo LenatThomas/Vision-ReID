@@ -1,9 +1,10 @@
 import os
+import torch
 import numpy as np
 import torchvision.transforms as T
 from PIL import Image
-from Data.Templates import ReidentificationDataset, SearchDataset
 from scipy.io import loadmat
+from Data.Templates import ReidentificationDataset, SearchDataset
 
 class Market1501IdentificationSet(ReidentificationDataset):
     def __init__(self, root, split = "bounding_box_train",transform = None):
@@ -78,11 +79,11 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
         return scene
 
     def _buildDict(self):
-        self._dict = {}
+        self._indexMap = {}
         for index, pid in enumerate(self._pids):
-            if pid not in self._dict.keys():
-                self._dict[pid] = []
-            self._dict[pid].append(index)
+            if pid not in self._indexMap.keys():
+                self._indexMap[pid] = []
+            self._indexMap[pid].append(index)
 
     def _build(self):
         self._crops = []
@@ -91,12 +92,15 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
         self._length = len(self._crops)
         self._pids = [i[1] for i in self._crops]
         self._buildDict()
+        self._buildMap()
          
     def __getitem__(self, index):
         if not (0 <= index < self._length):
             raise IndexError(f"Index {index} out of range of length {self._length}")
         imname = self._crops[index][0]
         pid    = self._crops[index][1]
+        label  = self._pid2Label[pid]
+        pid    = torch.tensor(label, dtype = torch.long)
         imagePath = os.path.join(self._imageDir, imname)
         image = Image.open(imagePath).convert('RGB')
         x, y, w, h    = self._crops[index][2]
@@ -110,7 +114,7 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
             )
         crop = image.crop((x1, y1 , x2 , y2))
         crop = self._transform(crop)
-        return crop, pid, index
+        return crop, label, index
 
     def filename(self, index):
         if not (0 <= index < self._length):

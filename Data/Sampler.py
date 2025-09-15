@@ -9,7 +9,8 @@ class PKBatchExpander:
         assert k > 1 
         self._k = k
         self._dataset = dataset
-        self._dict = dataset.indexMap
+        self._indexMap = dataset.indexMap
+        self._labelMap = dataset.pidMap
 
     def _rejectSampler(self, list, excluded , n ):
         sampleSpace = [item for item in list if item != excluded]
@@ -25,7 +26,8 @@ class PKBatchExpander:
         batchIndexes = []
         for i , label in enumerate(labels):
             label = label.item() if torch.is_tensor(label) else label
-            samples = self._dict[label]
+            label = self._labelMap[label]
+            samples = self._indexMap[label]
             reject = indices[i]
             selected = self._rejectSampler(samples, reject, self._k)
             for k in selected:

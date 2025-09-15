@@ -116,3 +116,17 @@ class VIT(nn.Module):
         features = F.normalize(features)
         logits = self.classifier(features)
         return logits, features
+    
+class VITEmbedding(nn.Module):
+    def __init__(self, baseModel):
+        super().__init__()
+        self.patches = baseModel.patches
+        self.transformer = baseModel.transformer
+        self.featureHead = baseModel.featureHead
+
+    def forward(self, x):
+        x = self.patches(x)
+        x = self.transformer(x)[:, 0]
+        features = self.featureHead(x)
+        features = F.normalize(features)
+        return features
