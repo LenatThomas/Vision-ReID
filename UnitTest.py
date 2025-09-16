@@ -11,24 +11,14 @@ from torch.utils.data import DataLoader, random_split
 from torchvision.transforms import Compose, Resize, ToTensor, RandomHorizontalFlip, Normalize
 from config import Config as C
 from Data.Gallery import Gallery
+from Model.Vit import VIT, VITEmbedding
 
-
-VERSION = C.VERSION
-BATCHSIZE = 128
-logFile = C.logFile
-logFile.parent.mkdir(exist_ok=True)
-root    = C.root
-split = C.split
-logger = setupLogger(logFile = logFile)
-
-transform = Compose([
-            Resize((256, 128)),
-            ToTensor(),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-dataset     = CuhkSysuSearchSet(root = root, split = split ,  transform = transform)
-for crop, imname, box in dataset:
-    print(imname, box)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+modelPath = C.modelPath
+checkPointPath = modelPath.with_suffix('.pth')
+embeddingPath = modelPath.with_suffix('.pt')
+checkpoint = torch.load(checkPointPath, map_location=device)
+bestModel = VIT(imageHeight=256, imageWidth=128, nClasses=751).to(device)
+bestModel.load_state_dict(checkpoint['model_state'])
+embeddingModel = VITEmbedding(baseModel = bestModel)
+torch.save(embeddingModel, embeddingPath)
