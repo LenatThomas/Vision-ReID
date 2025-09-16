@@ -64,8 +64,8 @@ if __name__ == '__main__':
         trainSize   = int(0.8 * len(dataset))
         valSize     = len(dataset) - trainSize
         train , val = random_split(dataset, [trainSize , valSize], generator = generator)
-        trainLoader = DataLoader(dataset = train, num_workers = 2, batch_size = P, shuffle = True)
-        valLoader   = DataLoader(dataset = val, num_workers = 2, batch_size = P, shuffle = True)
+        trainLoader = DataLoader(dataset = train, num_workers = 8, batch_size = P, shuffle = True)
+        valLoader   = DataLoader(dataset = val, num_workers = 8, batch_size = P, shuffle = True)
         expander    = PKBatchExpander(dataset = dataset)
 
         model       = VIT(imageHeight = 256, imageWidth = 128 , nClasses = dataset.nClasses).to(device = device)
@@ -162,14 +162,15 @@ if __name__ == '__main__':
                     logger.info(f"Early stopping triggered at epoch {epoch}")
                     break
 
+        logger.info('Training Ended')
+        logger.info(f'Training Duration = {datetime.now() - startTime}')
         checkpoint = torch.load(checkPointPath, map_location=device)
         bestModel = VIT(imageHeight=256, imageWidth=128, nClasses=dataset.nClasses).to(device)
         bestModel.load_state_dict(checkpoint['model_state'])
         embeddingModel = VITEmbedding(baseModel = bestModel)
         torch.save(embeddingModel, embeddingPath)
+        logger.info(f'Model saved to {embeddingPath}')
 
-        logger.info('Training Ended')
-        logger.info(f'Training Duration = {datetime.now() - startTime}')
         logger.info('Building Gallery')
         gallery = Gallery()
         gallery.build(model = embeddingModel, dataset = dataset)

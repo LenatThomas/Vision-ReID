@@ -12,7 +12,7 @@ class Config:
     LEARNING_RATE = 3e-4
     PATIENCE = 5
     CLIP = 1.0
-    RESUME = False
+    RESUME = True
     P = 128
     K = 6
     BATCHSIZE = P * K
