@@ -3,6 +3,21 @@ import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
+from Data.Templates import Gallery
+
+class SearchGallery(Gallery):
+    def build(self, dataset, batchsize = 128, numworker = 4):
+        self._clear()
+        loader = DataLoader(dataset = dataset, batch_size = batchsize, num_workers = numworker)
+        features , metadata = [] , []
+        with torch.no_grad():
+            for crops, imname, box in tqdm(loader, desc = 'Building Gallery'):
+                crops = crops.to(self._device)
+                embeddings = self._model(crops)
+                features.append(embeddings.cpu())    
+                metadata.extend([{'imname' : imname[i], 'box' : box[i]} for i in range(len(imname))])
+        self._features = torch.cat(features)
+        self._metadata = metadata
 
 class Gallery :
     def __init__(self, device = torch.device('cpu')):
@@ -58,9 +73,16 @@ class Gallery :
     def search(self, query , topK = 5):
         if not self.isbuilt():
             raise RuntimeError("Gallery is empty, build or load first")
-        if query.dim() == 1:
-            query = query.unsqueeze(0) 
-        query   = F.normalize(query.to(self._device), p=2, dim=1)
+        if self._model is None:
+            raise RuntimeError("No model loaded in Gallery. Please set self._model before searching.")
+        self._model.eval()
+        if query.dim() == 3:
+            query = query.unsqueeze(0)
+        with torch.no_grad():
+            query = query.to(self._device, non_blocking=True)
+            embedding = self._model(query)
+            embedding = F.normalize(embedding, p=2, dim=1)
+         
         gallery = F.normalize(self._features.to(self._device), p=2, dim=1)
         similarity = torch.mm(query, gallery.t())
         scores, indices = torch.topk(similarity, k = topK , dim=1)

@@ -124,8 +124,13 @@ class CuhkSysuIdentificationSet(ReidentificationDataset):
         return f'{imname}_{pid}'
 
 class CuhkSysuSearchSet(SearchDataset):
-    def __init__(self, root, split = 'Train.mat' ,transform = None):
-        super().__init__(root, transform)
+    def __init__(self, root, split = 'Train.mat', transform = None):
+        super().__init__(root, transform or T.Compose([
+            T.Resize((256, 128)),
+            T.RandomHorizontalFlip(),
+            T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]))
         self._annotationDir = os.path.join(root, 'annotation', 'test' , 'train_test', split)
         self._imageDir = os.path.join(root, 'Image', 'SSM')
         self._raw = loadmat(self._annotationDir, squeeze_me=True, struct_as_record=False)
