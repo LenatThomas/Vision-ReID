@@ -32,3 +32,10 @@ Test and Retrieve using
 python Inference.py
 python Retrieve.py
 ```
+
+## Outputs 
+### Reidentification outputs
+![265.png](./outputs/265.png)
+### Search outputs
+![search.png](./outputs/search.png)
+
