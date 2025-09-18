@@ -9,3 +9,4 @@ vt/
 .pth
 logs/
 model/
+outputs/
