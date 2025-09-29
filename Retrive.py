@@ -63,7 +63,7 @@ transform = Compose([
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-queryPath = Source / 'datasets/market1501/query/1222_c2s3_008107_00.jpg' 
+queryPath = Source / 'datasets/market1501/query/1268_c2s3_018782_00.jpg' 
 
 query = Image.open(queryPath).convert("RGB")
 query = transform(query)
